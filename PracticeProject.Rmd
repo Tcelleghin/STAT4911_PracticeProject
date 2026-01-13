@@ -25,7 +25,7 @@ data("airports")
 View(flights)
 View(weather)
 View(planes)
-View(airports)
+#View(airports)
 ```
 
 ```{r}
@@ -36,15 +36,27 @@ dataset = left_join(flights, planes, by = "tailnum")
 #remove observations without matching planes
 dataset = dataset %>% filter(!is.na(year.y))
 
-#Remove unecessary columns
+#Remove unnecessary columns
 dataset = dataset %>% select(-year.x, -hour, -minute, -speed)
 
 #Rename year.y to provide more context
 dataset = dataset %>% rename(year_constructed = year.y)
 
-dataset
 
 
+##join previous dataset with weather
+dataset = left_join(dataset, weather, by = c("time_hour", "origin"))
 
+#Check number of non-NA columns in combined dataset
+dataset = dataset %>% filter(!is.na(wind_gust))
+
+#remove duplicate columns
+dataset = dataset %>% select(-year, -month.y, -day.y, -wind_gust)
+
+#rename columns to more intuitive names
+dataset = dataset %>% rename(month = month.x,
+                             day = day.x)
+
+View(dataset)
 ```
 
