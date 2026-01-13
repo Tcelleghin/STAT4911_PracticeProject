@@ -1,0 +1,50 @@
+---
+title: "Stat_4911_PracticeProject"
+author: "Tyler Celleghin (Celleghin.2)"
+date: "2026-01-13"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+library(nycflights13)
+library(dplyr)
+```
+
+```{r}
+data("flights")
+#flights
+
+data("weather")
+
+data("planes")
+
+data("airports")
+
+View(flights)
+View(weather)
+View(planes)
+View(airports)
+```
+
+```{r}
+##join flights and planes datasets
+dataset = left_join(flights, planes, by = "tailnum")
+#dataset = merge(dataset, weather, by = "time_hour")
+
+#remove observations without matching planes
+dataset = dataset %>% filter(!is.na(year.y))
+
+#Remove unecessary columns
+dataset = dataset %>% select(-year.x, -hour, -minute, -speed)
+
+#Rename year.y to provide more context
+dataset = dataset %>% rename(year_constructed = year.y)
+
+dataset
+
+
+
+```
+
