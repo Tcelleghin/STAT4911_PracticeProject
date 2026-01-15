@@ -1,0 +1,100 @@
+---
+title: "Stat_4911_PracticeProject"
+author: "Tyler Celleghin (Celleghin.2)"
+date: "2026-01-13"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+library(nycflights13)
+library(dplyr)
+```
+
+```{r}
+data("flights")
+#flights
+
+data("weather")
+
+data("planes")
+
+data("airports")
+
+View(flights)
+View(weather)
+View(planes)
+#View(airports)
+```
+
+```{r}
+##join flights and planes datasets
+dataset = left_join(flights, planes, by = "tailnum")
+#dataset = merge(dataset, weather, by = "time_hour")
+
+#remove observations without matching planes
+dataset = dataset %>% filter(!is.na(year.y))
+
+#Remove unnecessary columns
+dataset = dataset %>% select(-year.x, -hour, -minute, -speed)
+
+#Rename year.y to provide more context
+dataset = dataset %>% rename(year_constructed = year.y)
+
+
+
+#join previous dataset with weather
+dataset = left_join(dataset, weather, by = c("time_hour", "origin"))
+
+#Check number of non-NA columns in combined dataset
+dataset = dataset %>% filter(!is.na(wind_gust))
+
+#remove duplicate columns
+dataset = dataset %>% select(-year, -month.y, -day.y, -wind_gust)
+
+#rename columns to more intuitive names
+dataset = dataset %>% rename(month = month.x,
+                             day = day.x)
+
+View(dataset)
+```
+
+univariate data for planes.
+```{r}
+hist(planes$year, main = "Histogram of Year Planes Manufactured", xlab = "Year")
+barplot(table(planes$type), main = "Barplot of Engine Type Frequencies")
+barplot(table(planes$manufacturer), main = "Barplot of Plane Manufacturers") 
+barplot(table(planes$model), main = "Barplot of Plane Models") 
+hist(planes$engines, main = "Historgram of Number of Engines per Plane")
+hist(planes$seats, main = "Histogram of Number of Seats")
+barplot(table(planes$engine), main = "Barplot of Engine Types")
+```
+
+
+Attempt at showing correlation between precipitation and delays when temperature below 32, found not enough data when temperature is below 32.
+```{r}
+cor(
+  subset(dataset, temp < 32)$dep_delay,
+  subset(dataset, temp < 32)$precip,
+  use = "complete.obs"
+)
+
+freezing <- subset(dataset, temp < 32)
+
+plot(freezing$precip, freezing$dep_delay)
+
+table(dataset$precip)
+
+table(freezing$precip)
+
+```
+Barplots of average delay and flights in a month
+```{r}
+
+avg_delay <- tapply(dataset$dep_delay, dataset$month, mean, na.rm = TRUE)
+
+barplot(avg_delay)
+
+barplot(table(dataset$month))
+```
