@@ -1,0 +1,424 @@
+---
+title: "Stat_4911_PracticeProject"
+author: "Tyler Celleghin (Celleghin.2)"
+date: "2026-01-13"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+library(nycflights13)
+library(dplyr)
+library(ggplot2)
+```
+
+# Data Procurement & Cleaning
+
+```{r}
+data("flights")
+#flights
+
+data("weather")
+
+data("planes")
+
+data("airports")
+
+#View(flights)
+#View(weather)
+#View(planes)
+#View(airports)
+```
+
+```{r}
+##MERGE DATASETS
+
+##join flights and planes datasets
+dataset = left_join(flights, planes, by = "tailnum")
+#dataset = merge(dataset, weather, by = "time_hour")
+
+#remove observations without matching planes
+dataset = dataset %>% filter(!is.na(year.y))
+
+#Remove unnecessary columns
+dataset = dataset %>% select(-year.x, -hour, -minute, -speed)
+
+#Rename year.y to provide more context
+dataset = dataset %>% rename(year_constructed = year.y)
+
+
+
+##join previous dataset with weather
+dataset = left_join(dataset, weather, by = c("time_hour", "origin"))
+
+#Check number of non-NA columns in combined dataset
+dataset = dataset %>% filter(!is.na(wind_gust))
+
+#remove duplicate columns
+dataset = dataset %>% select(-year, -month.y, -day.y, -wind_gust)
+
+#rename columns to more intuitive names
+dataset = dataset %>% rename(month = month.x,
+                             day = day.x)
+#View(dataset)
+```
+
+```{r}
+##Additional Data Cleaning
+
+#Remove all rows w/ NAs
+dataset = na.omit(dataset)
+
+#Remove unnecessary columns
+dataset = dataset %>% select(-day, -flight, -tailnum, -time_hour, -hour)
+
+#Vectors dividing vars into categorical and numeric 
+#(potentially useful for EDA code)
+cat_vars = c("month", "carrier", "origin", "dest", "type", "manufacturer", "model", "engines", "engine")
+
+num_vars = c("dep_time", "sched_dep_time", "arr_time", "sched_arr_time", "arr_delay", "air_time", "distance", "year_constructed", "seats", "temp", "dewp", "humid", "wind_dir", "wind_speed", "precip", "pressure", "visib")
+```
+
+# Exploratory Data Analysis
+
+```{r}
+##univariate analysis of flights data
+
+#Reponse variable dep_delay
+hist(na.omit(flights$dep_delay),
+     breaks = 50,
+     main = "Histogram of Departure Delay",
+     xlab = "Delay (minutes)")
+
+summary(flights$dep_delay)
+```
+```{r}
+#Other flights dataset variables
+
+hist(flights$dep_time,
+     main = "Histogram of Departure Time",
+     xlab = "Military Time",
+     col = "lightgray",
+     border = "white")
+
+hist(flights$sched_dep_time,
+     main = "Histogram of Scheduled Departure Time",
+     xlab = "Military Time",
+     col = "lightgray",
+     border = "white")
+
+hist(flights$arr_time,
+     main = "Histogram of Arrival Time",
+     xlab = "Military Time",
+     col = "lightgray",
+     border = "white")
+
+hist(flights$sched_arr_time,
+     main = "Histogram of Scheduled Arrival Time",
+     xlab = "Military Time",
+     col = "lightgray",
+     border = "white")
+
+hist(flights$arr_delay,
+     main = "Histogram of Arrival Delay",
+     xlab = "Delay (minutes)",
+     col = "lightgray",
+     border = "white")
+
+summary(flights$arr_delay)
+
+
+barplot(table(flights$carrier),
+        main = "Flight Counts by Carrier",
+        ylab = "Count",
+        las = 2)
+
+barplot(table(flights$tailnum),
+        main = "Category Counts",
+        ylab = "Count")
+
+tail_counts <- sort(table(flights$tailnum), decreasing = TRUE)[1:10]
+
+barplot(tail_counts,
+        main = "Top 10 Most Frequent Aircraft (Tail Numbers)",
+        ylab = "Number of Flights",
+        las = 2)
+
+barplot(table(flights$origin),
+        main = "Category Counts",
+        ylab = "Count")
+
+barplot(table(flights$dest),
+        main = "Category Counts",
+        ylab = "Count")
+
+hist(flights$air_time,
+     main = "Histogram of Air Time",
+     xlab = "Minutes",
+     col = "lightgray",
+     border = "white")
+
+summary(flights$air_time)
+
+hist(flights$distance,
+     main = "Histogram of Distance",
+     xlab = "Miles",
+     col = "lightgray",
+     border = "white")
+
+summary(flights$distance)
+```
+```{r}
+#join flights with planes and look at categoricals affect on departure delay
+flight_planes <- flights %>%
+  left_join(planes, by = "tailnum")
+
+model1 <- lm(dep_delay ~ year.y, data = flight_planes)
+summary(model1)
+
+model_type <- lm(dep_delay ~ type, data = flight_planes)
+summary(model_type)
+
+flight_planes %>%
+  count(manufacturer) %>%
+  filter(n > 1000)
+
+model_manu <- lm(dep_delay ~ manufacturer, data = flight_planes)
+summary(model_manu)
+```
+```{r}
+##univariate analysis of planes data
+
+hist(planes$year, main = "Histogram of Year Planes Manufactured", xlab = "Year")
+
+barplot(table(planes$type), main = "Barplot of Engine Type Frequencies")
+
+barplot(table(planes$manufacturer), main = "Barplot of Plane Manufacturers")
+
+barplot(table(planes$model), main = "Barplot of Plane Models") 
+
+hist(planes$engines, main = "Historgram of Number of Engines per Plane")
+
+hist(planes$seats, main = "Histogram of Number of Seats")
+
+barplot(table(planes$engine), main = "Barplot of Engine Types")
+```
+```{r}
+#Attempt at showing correlation between precipitation and delays when 
+#temperature below 32, found not enough data when temperature is below 32.
+
+cor(
+  subset(dataset, temp < 32)$dep_delay,
+  subset(dataset, temp < 32)$precip,
+  use = "complete.obs"
+)
+
+freezing <- subset(dataset, temp < 32)
+
+plot(freezing$precip, freezing$dep_delay)
+
+table(dataset$precip)
+
+table(freezing$precip)
+```
+
+```{r}
+#Barplots of average delay and flights in a month
+
+avg_delay <- tapply(dataset$dep_delay, dataset$month, mean, na.rm = TRUE)
+
+barplot(avg_delay)
+
+barplot(table(dataset$month))
+```
+```{r}
+#Univariate Analysis of weather data predictors
+
+hist(dataset$temp, main = "Histogram of Temperature", xlab = "Temperature (F)")
+
+hist(dataset$dewp, main = "Histogram of Dewpoint", xlab = "Dewpoint")
+
+hist(dataset$humid, main = "Histogram of Humidity", xlab = "Humidity")
+
+hist(dataset$wind_dir, main = "Histogram of Wind Direction", xlab = "Wind Direction")
+
+hist(dataset$wind_speed, main = "Histogram of Wind Speed", xlab = "Wind Speed")
+
+hist(dataset$precip, main = "Histogram of Precipitation", xlab = "Precipitation")
+
+hist(dataset$pressure, main = "Histogram of Pressure", xlab = "Pressure")
+
+hist(dataset$visib, main = "Histogram of Visibility", xlab = "Visibility")
+```
+
+```{r}
+#Bivariate scatterplots for all numeric predictors with the response of dep_delay 
+#Includes a smooth average line
+#Also calculate correlation for each predictor with dep_delay
+
+#Variables from flights dataset
+cor(dataset$dep_time, dataset$dep_delay, use = "complete.obs")
+ggplot(dataset, aes(x = dep_time, y = dep_delay)) + geom_point() + geom_smooth(method = "gam")
+
+cor(dataset$sched_dep_time, dataset$dep_delay, use = "complete.obs")
+ggplot(dataset, aes(x = sched_dep_time, y = dep_delay)) + geom_point() + geom_smooth(method = "gam")
+
+cor(dataset$arr_time, dataset$dep_delay, use = "complete.obs")
+ggplot(dataset, aes(x = arr_time, y = dep_delay)) + geom_point() + geom_smooth(method = "gam")
+
+cor(dataset$sched_arr_time, dataset$dep_delay, use = "complete.obs")
+ggplot(dataset, aes(x = sched_arr_time, y = dep_delay)) + geom_point() + geom_smooth(method = "gam")
+
+cor(dataset$arr_delay, dataset$dep_delay, use = "complete.obs")
+ggplot(dataset, aes(x = arr_delay, y = dep_delay)) + geom_point() + geom_smooth(method = "gam")
+
+cor(dataset$air_time, dataset$dep_delay, use = "complete.obs")
+ggplot(dataset, aes(x = air_time, y = dep_delay)) + geom_point() + geom_smooth(method = "gam")
+
+cor(dataset$distance, dataset$dep_delay, use = "complete.obs")
+ggplot(dataset, aes(x = distance, y = dep_delay)) + geom_point() + geom_smooth(method = "gam")
+```
+
+
+```{r}
+#Variables from planes dataset
+cor(dataset$year_constructed, dataset$dep_delay, use = "complete.obs")
+ggplot(dataset, aes(x = year_constructed, y = dep_delay)) + geom_point() + geom_smooth(method = "gam")
+
+cor(dataset$seats, dataset$dep_delay, use = "complete.obs")
+ggplot(dataset, aes(x = seats, y = dep_delay)) + geom_point() + geom_smooth(method = "gam")
+```
+
+
+```{r}
+#Variables from weather dataset
+cor(dataset$temp, dataset$dep_delay, use = "complete.obs")
+ggplot(dataset, aes(x = temp, y = dep_delay)) + geom_point() + geom_smooth(method = "gam")
+
+cor(dataset$dewp, dataset$dep_delay, use = "complete.obs")
+ggplot(dataset, aes(x = dewp, y = dep_delay)) + geom_point() + geom_smooth(method = "gam")
+
+cor(dataset$humid, dataset$dep_delay, use = "complete.obs")
+ggplot(dataset, aes(x = humid, y = dep_delay)) + geom_point() + geom_smooth(method = "gam")
+
+cor(dataset$wind_dir, dataset$dep_delay, use = "complete.obs")
+ggplot(dataset, aes(x = wind_dir, y = dep_delay)) + geom_point() + geom_smooth(method = "gam")
+
+cor(dataset$wind_speed, dataset$dep_delay, use = "complete.obs")
+ggplot(dataset, aes(x = wind_speed, y = dep_delay)) + geom_point() + geom_smooth(method = "gam")
+
+cor(dataset$precip, dataset$dep_delay, use = "complete.obs")
+ggplot(dataset, aes(x = precip, y = dep_delay)) + geom_point() + geom_smooth(method = "gam")
+
+cor(dataset$pressure, dataset$dep_delay, use = "complete.obs")
+ggplot(dataset, aes(x = pressure, y = dep_delay)) + geom_point() + geom_smooth(method = "gam")
+
+cor(dataset$visib, dataset$dep_delay, use = "complete.obs")
+ggplot(dataset, aes(x = visib, y = dep_delay)) + geom_point() + geom_smooth(method = "gam")
+```
+```{r}
+#Bivariate barplots for all categorical predictors with the response of dep_delay 
+
+#By month
+avg_month = dataset %>% group_by(month) %>% 
+  summarize(
+    avg_dep_delay = mean(dep_delay)
+    )
+
+ggplot(avg_month, aes(x = month, y = avg_dep_delay)) + geom_col()
+```
+```{r}
+#By carrier
+avg_carrier = dataset %>% group_by(carrier) %>% 
+  summarize(
+    avg_dep_delay = mean(dep_delay)
+    )
+
+ggplot(avg_carrier, aes(x = carrier, y = avg_dep_delay)) + geom_col()
+```
+```{r}
+#By origin
+avg_origin = dataset %>% group_by(origin) %>% 
+  summarize(
+    avg_dep_delay = mean(dep_delay)
+    )
+
+ggplot(avg_origin, aes(x = origin, y = avg_dep_delay)) + geom_col()
+```
+```{r}
+#By destination
+avg_dest = dataset %>% group_by(dest) %>% 
+  summarize(
+    avg_dep_delay = mean(dep_delay)
+    )
+
+ggplot(avg_dest, aes(x = dest, y = avg_dep_delay)) + geom_col()
+```
+```{r}
+#By plane type
+avg_type = dataset %>% group_by(type) %>% 
+  summarize(
+    avg_dep_delay = mean(dep_delay)
+    )
+
+ggplot(avg_type, aes(x = type, y = avg_dep_delay)) + geom_col()
+```
+```{r}
+#By plane manufacturer
+avg_manufact = dataset %>% group_by(manufacturer) %>% 
+  summarize(
+    avg_dep_delay = mean(dep_delay)
+    )
+
+ggplot(avg_manufact, aes(x = manufacturer, y = avg_dep_delay)) + geom_col()
+```
+```{r}
+#By model
+avg_model = dataset %>% group_by(model) %>% 
+  summarize(
+    avg_dep_delay = mean(dep_delay)
+    )
+
+ggplot(avg_model, aes(x = model, y = avg_dep_delay)) + geom_col()
+```
+```{r}
+#By number of engines
+avg_numEngines = dataset %>% group_by(engines) %>% 
+  summarize(
+    avg_dep_delay = mean(dep_delay)
+    )
+
+ggplot(avg_numEngines, aes(x = engines, y = avg_dep_delay)) + geom_col()
+```
+```{r}
+#By engine type
+avg_engine = dataset %>% group_by(engine) %>% 
+  summarize(
+    avg_dep_delay = mean(dep_delay)
+    )
+
+ggplot(avg_engine, aes(x = engine, y = avg_dep_delay)) + geom_col()
+```
+
+# Model Selection
+
+## Simple Linear Regression
+```{r}
+
+```
+
+## Ridge / Lasso
+```{r}
+
+```
+
+## PCA / PLS
+```{r}
+
+```
+
+## Regression Trees
+```{r}
+
+```
