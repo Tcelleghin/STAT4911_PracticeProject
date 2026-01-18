@@ -403,6 +403,18 @@ ggplot(avg_engine, aes(x = engine, y = avg_dep_delay)) + geom_col()
 
 # Model Selection
 
+```{r}
+#Preparation
+
+set.seed(4911) #For reproducibility
+
+ix = sample(1:nrow(dataset),nrow(dataset)*0.8) # 80/20 split
+
+dataset.train = dataset[ix, ] 
+dataset.test = dataset[-ix, ]
+```
+
+
 ## Simple Linear Regression
 ```{r}
 
